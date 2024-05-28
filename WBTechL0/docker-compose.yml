@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16.3-alpine
+    container_name: postgresqlWB
+    environment:
+      POSTGRES_DB: "ordersWB"
+      POSTGRES_USER: "admin"
+      POSTGRES_PASSWORD: "1111"
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  nats-streaming:
+    image: nats-streaming:alpine3.18
+    container_name: natsWB
+    ports:
+      - "4222:4222"
+      - "6222:6222"
+    restart: always
+
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - nats-streaming
+    restart: always
+    environment:
+      - PORT=8080
+      - PGPASSWORD=1111
+    entrypoint: sh -c "until psql -h postgres -U admin -d ordersWB -c 'select 1' > /dev/null 2>&1; do echo 'Waiting for postgres...'; sleep 2; done; echo 'Postgres is ready'; ./main"
