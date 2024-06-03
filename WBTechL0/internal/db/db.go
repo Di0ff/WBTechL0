@@ -94,6 +94,18 @@ func AddOrder(db *sql.DB, order Order, delivery Delivery, payment Payment, items
 				} else {
 					log.Println("Inserted order:", insertedOrder)
 				}
+
+				// Проверка данных в таблице delivery после коммита
+				var insertedDelivery Delivery
+				err = db.QueryRow(`SELECT order_uid, name, phone, zip, city, address, region, email 
+                                   FROM delivery WHERE order_uid = $1`, order.OrderUID).Scan(
+					&insertedDelivery.OrderUID, &insertedDelivery.Name, &insertedDelivery.Phone, &insertedDelivery.Zip,
+					&insertedDelivery.City, &insertedDelivery.Address, &insertedDelivery.Region, &insertedDelivery.Email)
+				if err != nil {
+					log.Println("Error querying inserted delivery:", err)
+				} else {
+					log.Println("Inserted delivery:", insertedDelivery)
+				}
 			}
 		}
 	}()
@@ -106,7 +118,7 @@ func AddOrder(db *sql.DB, order Order, delivery Delivery, payment Payment, items
 	}
 
 	// Вставка данных в таблицу orders
-	log.Println("Inserting into orders table:", order)
+	log.Printf("Inserting into orders table: %+v\n", order)
 	result, err := tx.Exec(`
         INSERT INTO orders (order_uid, track_number, entry, locale, internal_signature, customer_id, delivery_service, shardkey, sm_id, date_created, oof_shard)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
@@ -120,7 +132,7 @@ func AddOrder(db *sql.DB, order Order, delivery Delivery, payment Payment, items
 	log.Println("Rows affected in orders table:", rowsAffected)
 
 	// Вставка данных в таблицу delivery
-	log.Println("Inserting into delivery table:", delivery)
+	log.Printf("Inserting into delivery table: %+v\n", delivery)
 	result, err = tx.Exec(`
         INSERT INTO delivery (order_uid, name, phone, zip, city, address, region, email)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
@@ -133,8 +145,20 @@ func AddOrder(db *sql.DB, order Order, delivery Delivery, payment Payment, items
 	rowsAffected, _ = result.RowsAffected()
 	log.Println("Rows affected in delivery table:", rowsAffected)
 
+	// Проверка вставленных данных сразу после вставки
+	var insertedDelivery Delivery
+	err = tx.QueryRow(`SELECT order_uid, name, phone, zip, city, address, region, email 
+                       FROM delivery WHERE order_uid = $1`, delivery.OrderUID).Scan(
+		&insertedDelivery.OrderUID, &insertedDelivery.Name, &insertedDelivery.Phone, &insertedDelivery.Zip,
+		&insertedDelivery.City, &insertedDelivery.Address, &insertedDelivery.Region, &insertedDelivery.Email)
+	if err != nil {
+		log.Println("Error querying inserted delivery immediately after insertion:", err)
+	} else {
+		log.Println("Inserted delivery immediately after insertion:", insertedDelivery)
+	}
+
 	// Вставка данных в таблицу payment
-	log.Println("Inserting into payment table:", payment)
+	log.Printf("Inserting into payment table: %+v\n", payment)
 	result, err = tx.Exec(`
         INSERT INTO payment (transaction, request_id, currency, provider, amount, payment_dt, bank, delivery_cost, goods_total, custom_fee, order_uid)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
@@ -149,7 +173,7 @@ func AddOrder(db *sql.DB, order Order, delivery Delivery, payment Payment, items
 
 	// Вставка данных в таблицу items
 	for _, item := range items {
-		log.Println("Inserting into items table:", item)
+		log.Printf("Inserting into items table: %+v\n", item)
 		result, err = tx.Exec(`
             INSERT INTO items (chrt_id, track_number, price, rid, name, sale, size, total_price, nm_id, brand, status, order_uid)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,

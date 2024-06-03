@@ -54,3 +54,6 @@ CREATE TABLE items (
                        status INTEGER,
                        order_uid VARCHAR REFERENCES orders(order_uid) ON DELETE CASCADE
 );
+
+select * from orders;
+SELECT * FROM delivery WHERE order_uid = 'b563feb7b2b84b6test';
